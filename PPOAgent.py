@@ -42,6 +42,9 @@ class PPOAgent:
 
         return action, value, log_probs
     
+    def store_transition(self, state, action, log_prob, value, reward, done):
+        self.buffer.store(state, action, log_prob, value, reward, done)
+    
     def learn(self):
         for _ in range(self.n_epochs):
             states, actions, log_probs_old, values, rewards, dones, batches = self.buffer.generate_batches()
@@ -75,7 +78,22 @@ class PPOAgent:
                     weighted_clipped_probs = clipped_probs * advantage[batch]
 
                     actor_loss = -tf.reduce_mean(tf.math.minimum(weighted_probs, weighted_clipped_probs))
-    
+                    actor_loss = tf.reduce_mean(actor_loss)
+
+                    returns = advantage[batch] + values[batch]
+                    critic_loss = keras.losses.MSE(critic_value, returns)
+                
+                actor_params = self.actor.trainable_variables
+                critic_params = self.critic.trainable_variables
+                
+                actor_gradients = tape.gradient(actor_loss, actor_params)
+                critic_gradients = tape.gradient(critic_loss, critic_params)
+
+                self.actor.optimizer.apply_gradients(zip(actor_gradients, actor_params))
+                self.critic.optimizer.apply_gradients(zip(critic_gradients, critic_params))
+            
+            self.buffer.clear()
+                
     def save_models(self):
         print("... saving models ...")
         self.actor.save(self.checkpoint_directory + "/actor") # Save the whole actor model
