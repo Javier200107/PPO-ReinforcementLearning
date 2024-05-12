@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 import keras
 from PPONetworks import ActorNetwork, CriticNetwork
 import tensorflow_probability as tfp
@@ -9,8 +9,8 @@ import numpy as np
 class PPOAgent:
     """Proximal Policy Optimization Agent using TensorFlow 2.0.0 and Keras."""
 
-    def __init__(self, n_actions, input_dims, gamma=0.99, alpha=0.0003, gae_lambda=0.95,
-                policy_clip=0.2, batch_size=64, n_epochs=10, checkpoint_directory="/models") -> None:
+    def __init__(self, n_actions, input_dims, checkpoint_directory, gamma=0.99, alpha=0.0003, gae_lambda=0.95,
+                policy_clip=0.2, batch_size=64, n_epochs=10) -> None:
         self.n_actions = n_actions
         self.input_dims = input_dims
         self.gamma = gamma
@@ -55,23 +55,26 @@ class PPOAgent:
                 discount = 1
                 a_t = 0
                 for k in range(t, len(rewards) - 1):
-                    print(dones[k])
-                    print(type(dones[k]))
                     a_t += discount * (rewards[k] + self.gamma * values[k + 1] * (1 - dones[k]) - values[k])
                     discount *= self.gamma * self.gae_lambda
                 advantage[t] = a_t
 
             for batch in batches:
                 with tf.GradientTape(persistent=True) as tape:
-                    states = tf.convert_to_tensor(states[batch])
-                    actions = tf.convert_to_tensor(actions[batch])
-                    log_probs_old = tf.convert_to_tensor(log_probs_old[batch])
+                    batch_indices = tf.convert_to_tensor(batch, dtype=tf.int32)
+                    # print("states[batch]: ", states[batch])
+                    # print("actions[batch]: ", actions[batch])
+                    # print("log_probs_old[batch]: ", log_probs_old[batch])
+                    # Safely extract tensors for the current batch
+                    batch_states = tf.gather(states, batch_indices)
+                    batch_actions = tf.gather(actions, batch_indices)
+                    batch_log_probs_old = tf.gather(log_probs_old, batch_indices)
 
-                    probs = self.actor(states)
-                    new_log_probs = tfp.distributions.Categorical(probs=probs).log_prob(actions)
+                    probs = self.actor(batch_states)
+                    new_log_probs = tfp.distributions.Categorical(probs=probs).log_prob(batch_actions)
 
-                    critic_value = tf.squeeze(self.critic(states), 1)
-                    prob_rato = tf.math.exp(new_log_probs - log_probs_old)
+                    critic_value = tf.squeeze(self.critic(batch_states), 1)
+                    prob_rato = tf.math.exp(new_log_probs - batch_log_probs_old )
 
                     weighted_probs = prob_rato * advantage[batch]
                     clipped_probs = tf.clip_by_value(prob_rato, 1 - self.policy_clip, 1 + self.policy_clip)
