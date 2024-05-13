@@ -1,6 +1,6 @@
 import numpy as np
 
-class PPOBuffer:
+class PPOBufferDiscrete:
 
     def __init__(self, batch_size) -> None:
         self.batch_size = batch_size
