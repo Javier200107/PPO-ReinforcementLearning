@@ -1,10 +1,10 @@
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 import keras
-from PPONetworksDiscrete import ActorNetworkDiscrete, CriticNetworkDiscrete
-from PPONetworksContinuous import ActorNetworkContinuous, CriticNetworkContinuous
+from src.PPONetworksDiscrete import ActorNetworkDiscrete, CriticNetworkDiscrete
+from src.PPONetworksContinuous import ActorNetworkContinuous, CriticNetworkContinuous
 import tensorflow_probability as tfp
-from PPOBuffer import PPOBuffer
+from src.PPOBuffer import PPOBuffer
 import numpy as np
 
 class PPOAgent:
@@ -46,7 +46,7 @@ class PPOAgent:
                 discount = 1
                 a_t = 0
                 for k in range(t, len(rewards) - 1): 
-                    a_t += discount * (rewards[k] + self.gamma * values[k + 1] * (1 - dones[k]) - values[k]) # 
+                    a_t += discount * (rewards[k] + self.gamma * values[k + 1] * (1 - dones[k]) - values[k]) 
                     discount *= self.gamma * self.gae_lambda 
                 advantage[t] = a_t
 
@@ -64,6 +64,9 @@ class PPOAgent:
                 
                 actor_gradients = tape.gradient(actor_loss, actor_params)
                 critic_gradients = tape.gradient(critic_loss, critic_params)
+
+                #actor_gradients, _ = tf.clip_by_global_norm(actor_gradients, 50.0)
+                #critic_gradients, _ = tf.clip_by_global_norm(critic_gradients, 50.0)
 
                 self.actor.optimizer.apply_gradients(zip(actor_gradients, actor_params))
                 self.critic.optimizer.apply_gradients(zip(critic_gradients, critic_params))
@@ -106,6 +109,7 @@ class PPOAgentDiscrete(PPOAgent):
         self.buffer = PPOBuffer(batch_size=batch_size)
 
     def choose_action(self, observation):
+        """Choose an action using the actor network."""
         state = tf.convert_to_tensor([observation])
         probabilities = self.actor(state)
         action_probs = tfp.distributions.Categorical(probs=probabilities)
@@ -120,6 +124,7 @@ class PPOAgentDiscrete(PPOAgent):
         return action, value, log_probs
 
     def update_networks(self, batch_states, batch_actions, batch_log_probs_old, advantage, batch, values):
+        """Update the actor and critic networks using the PPO clipped objective function."""
         probs = self.actor(batch_states)
         dist = tfp.distributions.Categorical(probs=probs)
         new_log_probs = dist.log_prob(batch_actions)
@@ -161,6 +166,7 @@ class PPOAgentContinuous(PPOAgent):
         self.buffer = PPOBuffer(batch_size=batch_size)
 
     def choose_action(self, observation):
+        """Choose an action using the actor network."""
         state = tf.convert_to_tensor([observation], dtype=tf.float32)
         mu, sigma = self.actor(state)
         dist = tfp.distributions.Normal(mu, sigma)
@@ -171,6 +177,7 @@ class PPOAgentContinuous(PPOAgent):
         return action.numpy()[0], value.numpy()[0], log_prob.numpy()[0]
     
     def update_networks(self, batch_states, batch_actions, batch_log_probs_old, advantage, batch, values):
+        """Update the actor and critic networks using the PPO clipped objective function."""
         mu, sigma = self.actor(batch_states)  # Obtain mean and standard deviation for actions
         dist = tfp.distributions.Normal(mu, sigma)
         new_log_probs = dist.log_prob(batch_actions)
