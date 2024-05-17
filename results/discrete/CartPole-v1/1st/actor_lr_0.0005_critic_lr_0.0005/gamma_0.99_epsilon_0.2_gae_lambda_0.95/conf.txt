@@ -1,0 +1,1 @@
+{'N': 20, 'actor_lr': 0.0005, 'batch_size': 5, 'checkpoint_dir': './models/', 'critic_lr': 0.0005, 'epsilon': 0.2, 'gae_lambda': 0.95, 'gamma': 0.99, 'n_epochs': 4, 'n_games': 5000, 'video_dir': './video/'}
