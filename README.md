@@ -1,4 +1,4 @@
-# ATCI-PPO
+# PPO Algorithm Implementation - Reinforcement Learning
 
 
 This is a Python implementation of the PPO algorithm.
